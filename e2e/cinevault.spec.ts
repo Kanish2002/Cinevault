@@ -165,10 +165,18 @@ test('offline saved collection editing and full page reload', async ({ page, con
   await page.goto('/');
   await addVikram(page);
   await page.goto('/media/movie/911');
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
-  await page.waitForTimeout(1500);
+  // Cache this exact navigation only after the installed worker controls it.
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Watch status', exact: true })).toHaveValue(
+    'To Watch',
+  );
   await context.setOffline(true);
   await page.getByRole('combobox', { name: 'Watch status', exact: true }).selectOption('Watching');
+  await expect(page.getByRole('combobox', { name: 'Watch status', exact: true })).toHaveValue(
+    'Watching',
+  );
   await page.reload();
   await expect(page.getByRole('combobox', { name: 'Watch status', exact: true })).toHaveValue(
     'Watching',

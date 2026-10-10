@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 :root {
   --bg: #111210;
   --panel: #191a17;
@@ -11,7 +11,7 @@
   --sidebar: 238px;
   color-scheme: dark;
 }
-html[data-theme="light"] {
+html[data-theme='light'] {
   --bg: #f6f4ed;
   --panel: #fffdf7;
   --panel2: #edeae0;
@@ -274,7 +274,7 @@ small {
   color: var(--accent);
 }
 .nav-link.selected:before {
-  content: "";
+  content: '';
   position: absolute;
   width: 3px;
   height: 20px;
@@ -567,9 +567,7 @@ small {
   justify-content: space-between;
   gap: 26px;
   border: 1px solid var(--line);
-  background:
-    radial-gradient(ellipse at 90% 50%, #66543022, transparent 65%),
-    var(--panel);
+  background: radial-gradient(ellipse at 90% 50%, #66543022, transparent 65%), var(--panel);
   border-radius: 15px;
   position: relative;
   overflow: hidden;
@@ -658,10 +656,11 @@ small {
 .ticket-script {
   display: block;
   font:
-    italic 29px/1.2 Georgia,
+    italic 26px/1.2 Georgia,
     serif;
   margin-top: 26px;
   letter-spacing: -1px;
+  white-space: nowrap;
 }
 .ticket-dash {
   border-bottom: 1px dashed #796138;
@@ -670,7 +669,7 @@ small {
 }
 .ticket-dash:before,
 .ticket-dash:after {
-  content: "";
+  content: '';
   position: absolute;
   width: 16px;
   height: 16px;
@@ -830,7 +829,7 @@ small {
   transform: scale(1.035);
 }
 .poster-wrap:after {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   bottom: 0;
@@ -1770,12 +1769,7 @@ small {
 .skeleton-grid > div {
   aspect-ratio: 2/3;
   border-radius: 9px;
-  background: linear-gradient(
-    100deg,
-    var(--panel) 25%,
-    var(--panel2) 50%,
-    var(--panel) 75%
-  );
+  background: linear-gradient(100deg, var(--panel) 25%, var(--panel2) 50%, var(--panel) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -1874,7 +1868,7 @@ small {
     right: 55px;
   }
   .ticket-script {
-    font-size: 25px;
+    font-size: 23px;
   }
   .ticket-back strong {
     font-size: 20px;

@@ -20,6 +20,14 @@ A local-first personal movie and television vault. Search a full or partial titl
 - Installable PWA, home-screen capture shortcut, Android share target, offline saved collection editing, cached application shell, bounded poster cache, and optional browser storage persistence.
 - Optional authenticated Neon/Drizzle sync with server-verified GitHub identity, owner-scoped queries, durable offline outbox, incremental cursors, revisions, tombstones, idempotent mutations, optimistic conflict detection, and explicit conflict resolution.
 
+## Screenshots
+
+The screenshots show the actual empty collection with API credentials unconfigured.
+
+![Desktop CineVault](docs/desktop.png)
+
+![Android CineVault](docs/android.png)
+
 ## Stack and architecture
 
 Node.js 24, Next.js 16, React 19, strict TypeScript, Tailwind 4, shadcn-style local Button and Radix Dialog primitives, Lucide, Motion, Dexie, Zod, Papa Parse. Optional PostgreSQL uses Neon, Drizzle, and NextAuth's stable v4 line with GitHub OAuth and encrypted HttpOnly JWT sessions.
@@ -35,8 +43,8 @@ lib/import-export/       Versioned validation and transactional restore
 lib/sync/                Optional auth, Drizzle schema, protocol and client outbox
 migrations/              Optional PostgreSQL migration
 public/                  Service worker, original app icons
-scripts/                 Database migration
- tests/                  Deterministic unit/integration tests (not app data)
+scripts/                 Database migration and production smoke check
+tests/                  Deterministic unit/integration tests (not app data)
 e2e/                     Desktop and Android Playwright workflows
 ```
 
@@ -57,15 +65,15 @@ Open `http://localhost:3000`. For the production service worker, run `npm run bu
 
 All credentials are server-only. Never use `NEXT_PUBLIC_` for these values, commit `.env.local`, or paste secrets into source files.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `TMDB_API_READ_ACCESS_TOKEN` | Live search/discovery | TMDB v3 Bearer API Read Access Token (not the v3 API key) |
-| `OMDB_API_KEY` | Optional | OMDb IMDb rating lookup by IMDb ID |
-| `DATABASE_URL` | Cloud only | Neon PostgreSQL connection string |
-| `NEXTAUTH_SECRET` | Cloud only | Strong random auth secret configured by the account owner |
-| `NEXTAUTH_URL` | Cloud only | Canonical application HTTPS origin (localhost for development) |
-| `GITHUB_CLIENT_ID` | Cloud only | GitHub OAuth application client ID |
-| `GITHUB_CLIENT_SECRET` | Cloud only | GitHub OAuth application secret |
+| Variable                     | Required              | Purpose                                                        |
+| ---------------------------- | --------------------- | -------------------------------------------------------------- |
+| `TMDB_API_READ_ACCESS_TOKEN` | Live search/discovery | TMDB v3 Bearer API Read Access Token (not the v3 API key)      |
+| `OMDB_API_KEY`               | Optional              | OMDb IMDb rating lookup by IMDb ID                             |
+| `DATABASE_URL`               | Cloud only            | Neon PostgreSQL connection string                              |
+| `NEXTAUTH_SECRET`            | Cloud only            | Strong random auth secret configured by the account owner      |
+| `NEXTAUTH_URL`               | Cloud only            | Canonical application HTTPS origin (localhost for development) |
+| `GITHUB_CLIENT_ID`           | Cloud only            | GitHub OAuth application client ID                             |
+| `GITHUB_CLIENT_SECRET`       | Cloud only            | GitHub OAuth application secret                                |
 
 The app exposes only configuration booleans at `/api/config`. Missing TMDB yields an actionable 503 response. Missing OMDb does not block saves. Missing cloud configuration disables sign-in and sync while keeping local mode usable.
 
@@ -97,16 +105,16 @@ Provider fetches use ten-second timeouts, in-flight deduplication, at most two a
 
 Database `cinevault`, schema version 1:
 
-| Table | Role |
-| --- | --- |
-| `media` | Canonical `movie:TMDB_ID` or `tv:TMDB_ID` metadata |
-| `entries` | One unique library annotation record per media ID |
-| `lists` | Independent custom list records |
-| `items` | Unique `(listId, mediaId)` reference and position |
+| Table         | Role                                                       |
+| ------------- | ---------------------------------------------------------- |
+| `media`       | Canonical `movie:TMDB_ID` or `tv:TMDB_ID` metadata         |
+| `entries`     | One unique library annotation record per media ID          |
+| `lists`       | Independent custom list records                            |
+| `items`       | Unique `(listId, mediaId)` reference and position          |
 | `preferences` | Region, theme, default status/sort, voice/language choices |
-| `outbox` | Durable unsent mutation, base revision and mutation UUID |
-| `sync` | Last known remote revision and record snapshot |
-| `state` | Owner binding, cursor and unresolved conflict snapshots |
+| `outbox`      | Durable unsent mutation, base revision and mutation UUID   |
+| `sync`        | Last known remote revision and record snapshot             |
+| `state`       | Owner binding, cursor and unresolved conflict snapshots    |
 
 Additions, removals, list edits and restores use Dexie transactions. Duplicate adds do not reset status, notes, favorites, ratings, or added date. Deleting a list removes memberships, not media. Browser restarts preserve IndexedDB in the same profile; clearing site data, private browsing, profile deletion, app uninstall, or browser eviction can erase it. `navigator.storage.persist()` is available in Settings; denial is handled normally. Poster URLs are stored in metadata, not image blobs.
 
@@ -152,6 +160,8 @@ Playwright runs production-mode workflows in desktop Chrome and Pixel 7 viewport
 
 GitHub Actions runs lint, types, unit/integration tests, build, and browser tests on main and pull requests. API secrets are unnecessary for deterministic CI.
 
+For a real deployment, run `BASE_URL=https://YOUR_HOST npm run test:production` after installing Chromium. This uses an isolated test browser profile and a clearly synthetic backup record to verify production IndexedDB import, reload, status changes and Android-sized layout without touching your browser collection. Live provider checks still require valid credentials.
+
 ## Deployment
 
 The intended Vercel project is `cinevault`, linked to `Kanish2002/Cinevault` on main. Next.js is detected explicitly; production builds use `npm run build`, installation uses the lockfile with `npm ci --legacy-peer-deps`, and server functions run near India in `bom1`. Use the actual assigned production domain; do not assume `cinevault.vercel.app` is available.
@@ -163,6 +173,7 @@ After adding credentials in Vercel Project Settings → Environment Variables, r
 This product uses the TMDB API but is not endorsed or certified by TMDB. Availability is powered by JustWatch through TMDB, with regional links from the response. IMDb information is retrieved through OMDb when authorized. Movie images and metadata remain subject to their providers' terms. CineVault's original app icon and UI are not copied website assets. Respect provider licensing and usage limits, especially if making the application commercial.
 
 Primary API references:
+
 - <https://developer.themoviedb.org/docs/finding-data>
 - <https://developer.themoviedb.org/reference/tv-series-watch-providers>
 - <https://www.omdbapi.com/>

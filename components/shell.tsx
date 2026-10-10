@@ -1,6 +1,6 @@
-"use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+'use client';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   Compass,
@@ -13,30 +13,30 @@ import {
   Plus,
   ArrowUpRight,
   WifiOff,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { GlobalSearch } from "./search";
-import { useLibrary } from "./providers";
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { GlobalSearch } from './search';
+import { useLibrary } from './providers';
 const nav = [
-  { url: "/", name: "Home", icon: Home },
-  { url: "/discover", name: "Discover", icon: Compass },
-  { url: "/watchlist", name: "My Watchlist", icon: Bookmark },
-  { url: "/watched", name: "Watched", icon: CheckCheck },
-  { url: "/collections", name: "Collections", icon: Layers3 },
-  { url: "/statistics", name: "Statistics", icon: ChartNoAxesCombined },
+  { url: '/', name: 'Home', icon: Home },
+  { url: '/discover', name: 'Discover', icon: Compass },
+  { url: '/watchlist', name: 'My Watchlist', icon: Bookmark },
+  { url: '/watched', name: 'Watched', icon: CheckCheck },
+  { url: '/collections', name: 'Collections', icon: Layers3 },
+  { url: '/statistics', name: 'Statistics', icon: ChartNoAxesCombined },
 ];
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { rows } = useLibrary();
+  const { rows, prefs } = useLibrary();
   const [offline, setOffline] = useState(false);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
     update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
     return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
     };
   }, []);
   return (
@@ -58,14 +58,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link
               href={n.url}
               key={n.url}
-              className={`nav-link ${path === n.url ? "selected" : ""}`}
-              aria-current={path === n.url ? "page" : undefined}
+              className={`nav-link ${path === n.url ? 'selected' : ''}`}
+              aria-current={path === n.url ? 'page' : undefined}
             >
               <n.icon size={19} />
               {n.name}
-              {n.url === "/watchlist" && rows.length > 0 && (
+              {n.url === '/watchlist' && rows.length > 0 && (
                 <span className="nav-count">
-                  {rows.filter((m) => m.entry.watchStatus !== "Watched").length}
+                  {rows.filter((m) => m.entry.watchStatus !== 'Watched').length}
                 </span>
               )}
             </Link>
@@ -73,10 +73,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="sidebar-divider" />
         <div className="sidebar-label">QUICK CAPTURE</div>
-        <Link
-          href="/bulk"
-          className={`nav-link ${path === "/bulk" ? "selected" : ""}`}
-        >
+        <Link href="/bulk" className={`nav-link ${path === '/bulk' ? 'selected' : ''}`}>
           <Plus size={19} />
           Bulk Add
         </Link>
@@ -84,17 +81,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="local-card">
             <span className="local-dot" />
             <strong>Your collection. Your device.</strong>
-            <p>
-              No account needed. Made for the movies you don’t want to forget.
-            </p>
+            <p>No account needed. Made for the movies you don’t want to forget.</p>
             <Link href="/settings">
               Back up your collection <ArrowUpRight size={13} />
             </Link>
           </div>
-          <Link
-            href="/settings"
-            className={`nav-link ${path === "/settings" ? "selected" : ""}`}
-          >
+          <Link href="/settings" className={`nav-link ${path === '/settings' ? 'selected' : ''}`}>
             <Settings size={19} />
             Settings & backup
           </Link>
@@ -102,7 +94,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="avatar">K</div>
             <div>
               <strong>My personal vault</strong>
-              <small>Local-first · India</small>
+              <small>
+                Local-first · {prefs.preferredRegion === 'IN' ? 'India' : prefs.preferredRegion}
+              </small>
             </div>
             <span className="profile-dot" />
           </div>
@@ -117,11 +111,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </strong>
           </Link>
           <GlobalSearch />
-          <Link
-            className="topbar-settings"
-            href="/settings"
-            aria-label="Settings"
-          >
+          <Link className="topbar-settings" href="/settings" aria-label="Settings">
             <Settings size={21} />
           </Link>
         </header>
@@ -137,20 +127,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <footer className="footer">
           <span>CineVault · Every great story deserves a place.</span>
           <span>
-            Movie data:{" "}
-            <a
-              href="https://www.themoviedb.org"
-              target="_blank"
-              rel="noreferrer"
-            >
+            Movie data:{' '}
+            <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer">
               TMDB
-            </a>{" "}
-            · Availability:{" "}
-            <a
-              href="https://www.justwatch.com"
-              target="_blank"
-              rel="noreferrer"
-            >
+            </a>{' '}
+            · Availability:{' '}
+            <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
               JustWatch
             </a>
           </span>
@@ -161,11 +143,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Link
             href={n.url}
             key={n.url}
-            className={path === n.url ? "selected" : ""}
-            aria-current={path === n.url ? "page" : undefined}
+            className={path === n.url ? 'selected' : ''}
+            aria-current={path === n.url ? 'page' : undefined}
           >
             <n.icon size={20} />
-            <span>{n.name.replace("My ", "")}</span>
+            <span>{n.name.replace('My ', '')}</span>
           </Link>
         ))}
       </nav>
