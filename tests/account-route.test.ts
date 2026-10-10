@@ -5,6 +5,7 @@ vi.mock('@/lib/sync/auth', () => ({
   getAuth: () => ({ handler: () => ({ GET: mocks.get, POST: mocks.post }) }),
 }));
 import { GET, POST } from '@/app/api/auth/[...path]/route';
+import { isSameOrigin } from '@/lib/auth/request';
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split('/') }) });
 const request = (path: string, body: unknown, origin = 'https://cinevault.test') =>
   new Request(`https://cinevault.test/api/auth/${path}`, {
@@ -18,6 +19,14 @@ beforeEach(() => {
   mocks.post.mockReset();
 });
 describe('managed account proxy', () => {
+  it('checks the public origin when Next uses an internal listening URL', () => {
+    const req = new Request('http://0.0.0.0:3000/api/auth/sign-in/email', {
+      headers: { host: 'localhost:3000', origin: 'http://localhost:3000' },
+    });
+    expect(isSameOrigin(req)).toBe(true);
+    req.headers.set('origin', 'https://evil.test');
+    expect(isSameOrigin(req)).toBe(false);
+  });
   it('keeps local mode usable without auth configuration', async () => {
     mocks.configured = false;
     expect(
@@ -54,7 +63,9 @@ describe('managed account proxy', () => {
       return Response.json({ user: { id: 'provider-id' } });
     });
     const body = { email: ' User@Gmail.com ', password: 'a-long-app-password', name: 'User' };
-    expect((await POST(request('sign-up/email', body), context('sign-up/email'))).status).toBe(200);
+    const response = await POST(request('sign-up/email', body), context('sign-up/email'));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(mocks.post).toHaveBeenCalledOnce();
   });
 });

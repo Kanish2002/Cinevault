@@ -6,6 +6,7 @@ import { syncRecords } from '@/lib/sync/schema';
 import { cloudConfigured, getAuth } from '@/lib/sync/auth';
 import { accountOwner, syncIdentityMatches } from '@/lib/sync/identity';
 import { ensureSyncSchema } from '@/lib/sync/migrate';
+import { isSameOrigin } from '@/lib/auth/request';
 import { syncRequest, validateChange } from '@/lib/sync/protocol';
 import { guard, errorResponse } from '@/lib/api/route';
 export async function POST(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   let pool: Pool | undefined;
   try {
     guard(req);
-    if (req.headers.get('origin') !== new URL(req.url).origin)
+    if (!isSameOrigin(req))
       return Response.json({ error: 'Invalid request origin.' }, { status: 403 });
     const { data: session, error } = await getAuth().getSession();
     if (error)
