@@ -1,5 +1,5 @@
 /* Update this version whenever app shell behavior changes. Navigation is network-first. */
-const VERSION = 'cinevault-v1.0.1';
+const VERSION = 'cinevault-v1.0.2';
 const CORE = [
   '/',
   '/watchlist',

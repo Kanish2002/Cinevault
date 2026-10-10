@@ -151,11 +151,11 @@ test('full JSON restore into a fresh database', async ({ page, context }) => {
     .newContext();
   const second = await fresh.newPage();
   await mockMovies(second);
-  await second.goto('http://127.0.0.1:3000/settings');
+  await second.goto(new URL('/settings', page.url()).href);
   await second.getByLabel('Import backup file').setInputFiles(file!);
   await second.getByRole('button', { name: 'Merge backup', exact: true }).click();
   await expect(second.getByRole('status').filter({ hasText: 'Imported 1 titles' })).toBeVisible();
-  await second.goto('http://127.0.0.1:3000/watchlist');
+  await second.goto(new URL('/watchlist', page.url()).href);
   await expect(second.getByRole('heading', { name: 'Vikram', exact: true })).toBeVisible();
   await fresh.close();
 });

@@ -1,59 +1,41 @@
-"use client";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import {
-  Search,
-  Mic,
-  LoaderCircle,
-  Plus,
-  Check,
-  ArrowUpRight,
-  X,
-} from "lucide-react";
-import { api, errorMessage, languageName, poster, year } from "@/lib/utils";
-import { addMedia, db } from "@/lib/db";
-import { useLibrary } from "./providers";
-import { Button } from "./ui/button";
-import type { SearchResult, Media } from "@/types";
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult:
-    | ((e: {
-        results: {
-          [index: number]: { [index: number]: { transcript: string } };
-        };
-      }) => void)
-    | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-type VoiceWindow = Window & {
-  SpeechRecognition?: new () => Recognition;
-  webkitSpeechRecognition?: new () => Recognition;
-};
+'use client';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Search, Mic, Square, LoaderCircle, Plus, Check, ArrowUpRight, X } from 'lucide-react';
+import { api, errorMessage, languageName, poster, year } from '@/lib/utils';
+import { addMedia, db } from '@/lib/db';
+import { useLibrary } from './providers';
+import { Button } from './ui/button';
+import type { SearchResult, Media } from '@/types';
+import { useVoiceInput } from '@/lib/use-voice-input';
 export function GlobalSearch() {
   const searchParams = useSearchParams();
   const { prefs, rows, toast } = useLibrary();
-  const [query, setQuery] = useState(""),
+  const [query, setQuery] = useState(''),
     [results, setResults] = useState<SearchResult[]>([]),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
+    [error, setError] = useState(''),
     [open, setOpen] = useState(false),
     [active, setActive] = useState(0),
-    [adding, setAdding] = useState<string | null>(null),
-    [listening, setListening] = useState(false);
+    [adding, setAdding] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null),
-    input = useRef<HTMLInputElement>(null),
-    recognition = useRef<Recognition | null>(null);
+    input = useRef<HTMLInputElement>(null);
+  const voice = useVoiceInput({
+    language: prefs.voiceLanguage,
+    onError: toast,
+    onTranscript: (transcript) => {
+      const text = transcript
+        .replace(/^(?:add|save|search(?: for)?|find)\s+/i, '')
+        .replace(/\s+(?:to (?:my )?(?:watchlist|collection))\.?$/i, '');
+      setQuery(text);
+      setOpen(true);
+    },
+  });
   const saved = new Set(rows.map((m) => m.id));
   useEffect(() => {
-    if (searchParams.get("capture")) {
-      setQuery(searchParams.get("q") || "");
+    if (searchParams.get('capture')) {
+      setQuery(searchParams.get('q') || '');
       setOpen(true);
       input.current?.focus();
     }
@@ -61,7 +43,7 @@ export function GlobalSearch() {
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
-      setError("");
+      setError('');
       setBusy(false);
       return;
     }
@@ -69,12 +51,12 @@ export function GlobalSearch() {
     const timer = setTimeout(async () => {
       if (!navigator.onLine) {
         setError(
-          "You are offline. Your saved collection is available; online search will resume when connected.",
+          'You are offline. Your saved collection is available; online search will resume when connected.',
         );
         return;
       }
       setBusy(true);
-      setError("");
+      setError('');
       try {
         const d = await api<{ results: SearchResult[] }>(
           `/api/search?q=${encodeURIComponent(query.trim())}`,
@@ -100,10 +82,9 @@ export function GlobalSearch() {
     const outside = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", outside);
+    document.addEventListener('mousedown', outside);
     return () => {
-      document.removeEventListener("mousedown", outside);
-      recognition.current?.stop();
+      document.removeEventListener('mousedown', outside);
     };
   }, []);
   useEffect(() => {
@@ -111,14 +92,14 @@ export function GlobalSearch() {
       input.current?.focus();
       setOpen(true);
     };
-    window.addEventListener("cinevault-search", listener);
-    return () => window.removeEventListener("cinevault-search", listener);
+    window.addEventListener('cinevault-search', listener);
+    return () => window.removeEventListener('cinevault-search', listener);
   }, []);
   async function quickAdd(result: SearchResult) {
     setAdding(result.id);
     try {
       if (await db.entries.get(result.id)) {
-        toast("Already saved. Your existing status is preserved.");
+        toast('Already saved. Your existing status is preserved.');
         return;
       }
       const cached = await db.media.get(result.id);
@@ -132,56 +113,12 @@ export function GlobalSearch() {
       toast(
         added
           ? `${media.title} added to ${prefs.defaultWatchStatus} · ${languageName(media.originalLanguage)}`
-          : "Already in your collection.",
+          : 'Already in your collection.',
       );
     } catch (e) {
       toast(errorMessage(e));
     } finally {
       setAdding(null);
-    }
-  }
-  function voice() {
-    if (listening) {
-      recognition.current?.stop();
-      return;
-    }
-    const w = window as VoiceWindow,
-      Speech = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!Speech) {
-      toast(
-        "Voice search is not supported in this browser. Use text search or try Chrome on Android.",
-      );
-      input.current?.focus();
-      return;
-    }
-    const r = new Speech();
-    r.lang = prefs.voiceLanguage;
-    r.continuous = false;
-    r.interimResults = false;
-    r.onresult = (e) => {
-      let text = e.results[0][0].transcript.trim();
-      text = text
-        .replace(/^(?:add|save|search(?: for)?|find)\s+/i, "")
-        .replace(/\s+(?:to (?:my )?(?:watchlist|collection))\.?$/i, "");
-      setQuery(text);
-      setOpen(true);
-      input.current?.focus();
-    };
-    r.onerror = (e) => {
-      toast(
-        e.error === "not-allowed"
-          ? "Microphone permission was denied. Allow microphone access or use text search."
-          : `Voice search stopped (${e.error}). Try again or type the title.`,
-      );
-      setListening(false);
-    };
-    r.onend = () => setListening(false);
-    recognition.current = r;
-    try {
-      r.start();
-      setListening(true);
-    } catch {
-      toast("The microphone could not start. Try again.");
     }
   }
   return (
@@ -196,9 +133,7 @@ export function GlobalSearch() {
           aria-autocomplete="list"
           aria-expanded={open && !!query}
           aria-controls="movie-suggestions"
-          aria-activedescendant={
-            results.length && open ? `suggestion-${active}` : undefined
-          }
+          aria-activedescendant={results.length && open ? `suggestion-${active}` : undefined}
           placeholder="Find a movie, series, or your next obsession…"
           value={query}
           onFocus={() => setOpen(true)}
@@ -207,16 +142,16 @@ export function GlobalSearch() {
             setOpen(true);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
-            if (e.key === "ArrowDown") {
+            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'ArrowDown') {
               e.preventDefault();
               setActive((i) => Math.min(results.length - 1, i + 1));
             }
-            if (e.key === "ArrowUp") {
+            if (e.key === 'ArrowUp') {
               e.preventDefault();
               setActive((i) => Math.max(0, i - 1));
             }
-            if (e.key === "Enter" && results[active]) {
+            if (e.key === 'Enter' && results[active]) {
               e.preventDefault();
               void quickAdd(results[active]);
             }
@@ -226,7 +161,7 @@ export function GlobalSearch() {
           <button
             aria-label="Clear search"
             onClick={() => {
-              setQuery("");
+              setQuery('');
               input.current?.focus();
             }}
           >
@@ -234,21 +169,39 @@ export function GlobalSearch() {
           </button>
         )}
         <button
-          className={listening ? "voice-button listening" : "voice-button"}
-          aria-label={listening ? "Stop voice search" : "Start voice search"}
-          aria-pressed={listening}
-          onClick={voice}
+          className={voice.active ? 'voice-button listening' : 'voice-button'}
+          aria-label={voice.active ? 'Stop voice search' : 'Start voice search'}
+          aria-pressed={voice.active}
+          disabled={voice.status === 'stopping'}
+          onClick={() => (voice.active ? voice.stop() : voice.start())}
         >
-          <Mic size={19} />
+          {voice.active ? <Square size={17} fill="currentColor" /> : <Mic size={19} />}
         </button>
         <span className="search-shortcut">↵</span>
       </div>
-      {listening && (
-        <div className="voice-caption" role="status">
-          Listening… Say a movie title. You’ll choose the match before saving.
+      {voice.active && (
+        <div className="voice-caption">
+          <div role="status">
+            <strong>
+              {voice.status === 'starting'
+                ? 'Starting microphone…'
+                : voice.status === 'stopping'
+                  ? 'Finishing…'
+                  : 'Listening…'}
+            </strong>
+            <span>{voice.interim || 'Say a movie title. Review the matches before saving.'}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={voice.status === 'stopping'}
+            onClick={voice.stop}
+          >
+            <Square size={12} fill="currentColor" /> Stop
+          </Button>
         </div>
       )}
-      {open && query.trim() && (
+      {open && query.trim() && !voice.active && (
         <div className="search-results">
           <div className="search-label">
             <span>FIND YOUR NEXT STORY</span>
@@ -257,35 +210,24 @@ export function GlobalSearch() {
           {error && (
             <div role="alert" className="search-message">
               {error}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setQuery((q) => q + " ")}
-              >
+              <Button variant="outline" size="sm" onClick={() => setQuery((q) => q + ' ')}>
                 Retry
               </Button>
             </div>
           )}
           {!busy && !error && !results.length && (
             <p className="search-message">
-              No titles found. Try a shorter title, original title, or add the
-              release year.
+              No titles found. Try a shorter title, original title, or add the release year.
             </p>
           )}
-          <ul
-            id="movie-suggestions"
-            role="listbox"
-            aria-label="Movie suggestions"
-          >
+          <ul id="movie-suggestions" role="listbox" aria-label="Movie suggestions">
             {results.map((r, i) => (
               <li
                 id={`suggestion-${i}`}
                 role="option"
                 aria-selected={active === i}
                 key={r.id}
-                className={
-                  active === i ? "search-result active" : "search-result"
-                }
+                className={active === i ? 'search-result active' : 'search-result'}
                 onMouseEnter={() => setActive(i)}
               >
                 <Link
@@ -294,29 +236,25 @@ export function GlobalSearch() {
                   className="result-main"
                 >
                   {poster(r.posterPath) ? (
-                    <img src={poster(r.posterPath, "w92")!} alt="" />
+                    <img src={poster(r.posterPath, 'w92')!} alt="" />
                   ) : (
                     <div className="poster-mini">CV</div>
                   )}
                   <div>
                     <strong>{r.title}</strong>
                     <small>
-                      {year(r.releaseDate)} · {languageName(r.originalLanguage)}{" "}
-                      · {r.mediaType === "tv" ? "Series" : "Movie"}
+                      {year(r.releaseDate)} · {languageName(r.originalLanguage)} ·{' '}
+                      {r.mediaType === 'tv' ? 'Series' : 'Movie'}
                     </small>
-                    {r.originalTitle !== r.title && (
-                      <small>{r.originalTitle}</small>
-                    )}
+                    {r.originalTitle !== r.title && <small>{r.originalTitle}</small>}
                   </div>
                 </Link>
                 <div className="result-actions">
                   {r.tmdbRating !== null && (
-                    <span className="rating-small">
-                      TMDB {r.tmdbRating.toFixed(1)}
-                    </span>
+                    <span className="rating-small">TMDB {r.tmdbRating.toFixed(1)}</span>
                   )}
                   <Button
-                    variant={saved.has(r.id) ? "ghost" : "default"}
+                    variant={saved.has(r.id) ? 'ghost' : 'default'}
                     size="icon"
                     aria-label={
                       saved.has(r.id)
@@ -345,9 +283,7 @@ export function GlobalSearch() {
               </li>
             ))}
           </ul>
-          <div className="search-foot">
-            ↑ ↓ to browse · Enter to add · Metadata from TMDB
-          </div>
+          <div className="search-foot">↑ ↓ to browse · Enter to add · Metadata from TMDB</div>
         </div>
       )}
     </div>

@@ -111,9 +111,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </strong>
           </Link>
           <GlobalSearch />
-          <Link className="topbar-settings" href="/settings" aria-label="Settings">
-            <Settings size={21} />
-          </Link>
+          <div className="topbar-actions">
+            <Link
+              href="/bulk"
+              className={`mobile-bulk-link ${path === '/bulk' ? 'selected' : ''}`}
+              aria-current={path === '/bulk' ? 'page' : undefined}
+            >
+              <Plus size={16} aria-hidden /> Bulk Add
+            </Link>
+            <Link className="topbar-settings" href="/settings" aria-label="Settings">
+              <Settings size={21} />
+            </Link>
+          </div>
         </header>
         {offline && (
           <div className="offline-banner" role="status">
