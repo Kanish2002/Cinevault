@@ -24,7 +24,7 @@ import {
   download,
   type Backup,
 } from '@/lib/import-export';
-import { queueExisting, runSync, resolveConflict } from '@/lib/sync/client';
+import { queueExisting, runSync, resolveConflict, assertVaultOwner } from '@/lib/sync/client';
 import { api, errorMessage } from '@/lib/utils';
 import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
@@ -61,6 +61,13 @@ export function SettingsPage() {
     [prefs.languagePreferences],
   );
   const owner = session?.user?.id;
+  const [syncChoice, setSyncChoice] = useState<boolean | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+  useEffect(() => {
+    if (syncChoice === prefs.syncEnabled) setSyncChoice(null);
+  }, [prefs.syncEnabled, syncChoice]);
+  const binding = useLiveQuery(() => db.state.get('sync-owner'), []);
+  const wrongAccount = !!owner && !!binding && binding.value !== owner;
 
   async function exportFile(format: 'json' | 'csv') {
     setBusy(true);
@@ -310,22 +317,39 @@ export function SettingsPage() {
           </h2>
           <p>
             {config?.cloud
-              ? 'Authenticated sync is configured.'
-              : 'Local mode is active. Cloud sync needs Neon and GitHub OAuth credentials.'}
+              ? 'Sign in with Google and enable sync to keep your movies, lists, notes, ratings, and preferences together on every device.'
+              : 'Local mode is active. Account sync needs Neon and Google sign-in configuration.'}
           </p>
           {config?.cloud ? (
-            session ? (
+            owner ? (
               <>
                 <p>Signed in as {session.user?.email || session.user?.name}</p>
+                {wrongAccount && (
+                  <p role="alert">
+                    This local vault belongs to another account. Use a separate browser profile for
+                    this Google account. Export a backup before moving an older GitHub vault.
+                  </p>
+                )}
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
-                    checked={prefs.syncEnabled}
+                    checked={syncChoice ?? prefs.syncEnabled}
+                    disabled={wrongAccount || syncBusy}
                     onChange={(e) => {
                       const enabled = e.target.checked;
-                      void queueExisting()
-                        .then(() => patch({ syncEnabled: enabled }))
-                        .catch((e) => toast(errorMessage(e)));
+                      setSyncChoice(enabled);
+                      setSyncBusy(true);
+                      void (
+                        enabled && owner
+                          ? assertVaultOwner(owner).then(queueExisting)
+                          : Promise.resolve()
+                      )
+                        .then(() => savePreferences({ syncEnabled: enabled }))
+                        .catch((e) => {
+                          setSyncChoice(null);
+                          toast(errorMessage(e));
+                        })
+                        .finally(() => setSyncBusy(false));
                     }}
                   />
                   Enable sync for this local vault
@@ -336,7 +360,7 @@ export function SettingsPage() {
                 <div className="inline-actions">
                   <Button
                     variant="outline"
-                    disabled={!owner}
+                    disabled={!owner || wrongAccount}
                     onClick={() => {
                       if (owner)
                         void runSync(owner)
@@ -353,8 +377,9 @@ export function SettingsPage() {
                   <Button
                     variant="ghost"
                     onClick={() => {
-                      patch({ syncEnabled: false });
-                      void signOut();
+                      void savePreferences({ syncEnabled: false })
+                        .then(() => signOut({ callbackUrl: '/settings' }))
+                        .catch((e) => toast(errorMessage(e)));
                     }}
                   >
                     Sign out
@@ -362,13 +387,14 @@ export function SettingsPage() {
                 </div>
               </>
             ) : (
-              <Button onClick={() => void signIn('github')}>Sign in with GitHub</Button>
+              <Button onClick={() => void signIn('google', { callbackUrl: '/settings' })}>
+                Continue with Google
+              </Button>
             )
           ) : (
             <p className="small muted">
-              Configure DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, GITHUB_CLIENT_ID, and
-              GITHUB_CLIENT_SECRET, then run the sync migration. No anonymous database writes are
-              exposed.
+              Google account sync is not available yet. Your saved collection remains on this
+              device.
             </p>
           )}
           {conflicts?.map((c) => (

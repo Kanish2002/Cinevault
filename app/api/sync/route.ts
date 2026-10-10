@@ -1,50 +1,46 @@
-import { getToken } from "next-auth/jwt";
-import type { NextRequest } from "next/server";
-import { Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { and, eq, gt, asc, sql } from "drizzle-orm";
-import { syncRecords } from "@/lib/sync/schema";
-import { cloudConfigured } from "@/lib/sync/auth";
-import { syncRequest, validateChange } from "@/lib/sync/protocol";
-import { guard, errorResponse } from "@/lib/api/route";
+import { getToken } from 'next-auth/jwt';
+import type { NextRequest } from 'next/server';
+import { Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { and, eq, gt, asc, sql } from 'drizzle-orm';
+import { syncRecords } from '@/lib/sync/schema';
+import { cloudConfigured } from '@/lib/sync/auth';
+import { isGoogleOwner, syncIdentityMatches } from '@/lib/sync/identity';
+import { syncRequest, validateChange } from '@/lib/sync/protocol';
+import { guard, errorResponse } from '@/lib/api/route';
 export async function POST(req: NextRequest) {
   if (!cloudConfigured())
     return Response.json(
-      { error: "Cloud sync is not configured. Local mode remains available." },
+      { error: 'Cloud sync is not configured. Local mode remains available.' },
       { status: 503 },
     );
   let pool: Pool | undefined;
   try {
     guard(req);
-    if (req.headers.get("origin") !== new URL(req.url).origin)
-      return Response.json(
-        { error: "Invalid request origin." },
-        { status: 403 },
-      );
+    if (req.headers.get('origin') !== new URL(req.url).origin)
+      return Response.json({ error: 'Invalid request origin.' }, { status: 403 });
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token?.sub)
-      return Response.json(
-        { error: "Sign in to synchronize your collection." },
-        { status: 401 },
-      );
+    if (!isGoogleOwner(token?.sub))
+      return Response.json({ error: 'Sign in to synchronize your collection.' }, { status: 401 });
     const raw = await req.text();
     if (raw.length > 2000000)
-      return Response.json({ error: "Sync batch too large." }, { status: 413 });
-    const body = syncRequest.parse(JSON.parse(raw)),
-      changes = body.changes.map(validateChange),
-      owner = token.sub;
+      return Response.json({ error: 'Sync batch too large.' }, { status: 413 });
+    const body = syncRequest.parse(JSON.parse(raw));
+    if (!syncIdentityMatches(token!.sub, body.expectedOwner))
+      return Response.json(
+        { error: 'Your signed-in account changed. Reload before synchronizing.' },
+        { status: 409 },
+      );
+    const changes = body.changes.map(validateChange),
+      owner = token!.sub!;
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const database = drizzle(pool);
     const result = await database.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${owner}))`);
-      const accepted: { key: string; mutationId: string; revision: number }[] =
-          [],
+      const accepted: { key: string; mutationId: string; revision: number }[] = [],
         conflicts: string[] = [];
       for (const c of changes) {
-        const where = and(
-          eq(syncRecords.ownerId, owner),
-          eq(syncRecords.key, c.key),
-        );
+        const where = and(eq(syncRecords.ownerId, owner), eq(syncRecords.key, c.key));
         const [current] = await tx.select().from(syncRecords).where(where);
         if (current?.mutationId === c.mutationId) {
           accepted.push({
@@ -82,12 +78,7 @@ export async function POST(req: NextRequest) {
       const records = await tx
         .select()
         .from(syncRecords)
-        .where(
-          and(
-            eq(syncRecords.ownerId, owner),
-            gt(syncRecords.sequence, body.cursor),
-          ),
-        )
+        .where(and(eq(syncRecords.ownerId, owner), gt(syncRecords.sequence, body.cursor)))
         .orderBy(asc(syncRecords.sequence))
         .limit(1000);
       return {
@@ -106,7 +97,7 @@ export async function POST(req: NextRequest) {
         hasMore: records.length === 1000,
       };
     });
-    return Response.json(result, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     return errorResponse(e);
   } finally {

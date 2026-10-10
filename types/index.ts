@@ -1,13 +1,7 @@
-import { z } from "zod";
-export const statuses = [
-  "To Watch",
-  "Watching",
-  "Watched",
-  "On Hold",
-  "Dropped",
-] as const;
+import { z } from 'zod';
+export const statuses = ['To Watch', 'Watching', 'Watched', 'On Hold', 'Dropped'] as const;
 export type WatchStatus = (typeof statuses)[number];
-export const mediaKey = (type: "movie" | "tv", id: number) => `${type}:${id}`;
+export const mediaKey = (type: 'movie' | 'tv', id: number) => `${type}:${id}`;
 const text = z.string().max(10000);
 const personSchema = z.object({
   id: z.number(),
@@ -27,13 +21,13 @@ export const availabilitySchema = z.object({
   groups: z.record(z.string(), z.array(providerSchema)),
   checkedAt: z.string(),
   expiresAt: z.string(),
-  state: z.enum(["available", "unknown", "error"]),
+  state: z.enum(['available', 'unknown', 'error']),
   error: text.optional(),
 });
 export const mediaSchema = z.object({
   id: z.string(),
   tmdbId: z.number().int().positive(),
-  mediaType: z.enum(["movie", "tv"]),
+  mediaType: z.enum(['movie', 'tv']),
   title: z.string().min(1).max(500),
   originalTitle: text,
   originalLanguage: z.string().max(20),
@@ -48,7 +42,7 @@ export const mediaSchema = z.object({
   imdbId: text.nullable(),
   imdbRating: z.number().min(0).max(10).nullable(),
   imdbVotes: z.number().nonnegative().nullable(),
-  ratingsState: z.enum(["available", "unconfigured", "unavailable", "error"]),
+  ratingsState: z.enum(['available', 'unconfigured', 'unavailable', 'error']),
   spokenLanguages: z.array(z.string()),
   productionCountries: z.array(z.string()),
   productionCompanies: z.array(z.string()),
@@ -112,9 +106,9 @@ export const itemSchema = z.object({
 export type ListItem = z.infer<typeof itemSchema>;
 export type LibraryMedia = Media & { entry: LibraryEntry };
 export const prefsSchema = z.object({
-  id: z.literal("main"),
+  id: z.literal('main'),
   preferredRegion: z.string().regex(/^[A-Z]{2}$/),
-  theme: z.enum(["dark", "light"]),
+  theme: z.enum(['dark', 'light']),
   defaultWatchStatus: z.enum(statuses),
   defaultSort: z.string(),
   languagePreferences: z.array(z.string()),
@@ -123,32 +117,33 @@ export const prefsSchema = z.object({
   syncEnabled: z.boolean(),
 });
 export type Preferences = z.infer<typeof prefsSchema>;
+export const cloudPrefsSchema = prefsSchema.omit({ syncEnabled: true, lastBackupAt: true });
 export const defaultPrefs: Preferences = {
-  id: "main",
-  preferredRegion: "IN",
-  theme: "dark",
-  defaultWatchStatus: "To Watch",
-  defaultSort: "added",
-  languagePreferences: ["ta", "en"],
-  voiceLanguage: "en-IN",
+  id: 'main',
+  preferredRegion: 'IN',
+  theme: 'dark',
+  defaultWatchStatus: 'To Watch',
+  defaultSort: 'added',
+  languagePreferences: ['ta', 'en'],
+  voiceLanguage: 'en-IN',
   lastBackupAt: null,
   syncEnabled: false,
 };
 export type SearchResult = Pick<
   Media,
-  | "id"
-  | "tmdbId"
-  | "mediaType"
-  | "title"
-  | "originalTitle"
-  | "originalLanguage"
-  | "releaseDate"
-  | "posterPath"
-  | "backdropPath"
-  | "tmdbRating"
-  | "overview"
+  | 'id'
+  | 'tmdbId'
+  | 'mediaType'
+  | 'title'
+  | 'originalTitle'
+  | 'originalLanguage'
+  | 'releaseDate'
+  | 'posterPath'
+  | 'backdropPath'
+  | 'tmdbRating'
+  | 'overview'
 > & { genreIds: number[]; popularity: number };
-export type SyncKind = "media" | "entries" | "lists" | "items";
+export type SyncKind = 'media' | 'entries' | 'lists' | 'items' | 'preferences';
 export type Outbox = {
   key: string;
   kind: SyncKind;

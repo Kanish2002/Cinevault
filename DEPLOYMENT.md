@@ -1,6 +1,6 @@
 # CineVault deployment report
 
-Verified on 9 October 2026.
+Initial deployment verified on 9 October 2026; Google sync update prepared on 10 October 2026.
 
 - Public production application: **https://cinevault-kanish-tech.vercel.app**
 - Additional assigned domain: https://cinevault-vert.vercel.app
@@ -23,7 +23,7 @@ Real microphone recognition, live TMDB/OMDb results, and authenticated Neon sync
 
 ## Required setup to activate live search
 
-The production `/api/config` reports `tmdb: false`, `omdb: false`, `cloud: false`. This deployment currently supports local collection management and importing an existing backup, but a new user cannot retrieve movies until TMDB is configured.
+At the initial deployment, `/api/config` reported `tmdb: false`, `omdb: false`, `cloud: false`. On 10 October Vercel environment metadata confirms Production entries for TMDB, OMDb, and Neon `DATABASE_URL`; presence alone does not verify their values. Google OAuth and session variables are still missing. This deployment currently supports local collection management and importing an existing backup, but a new user cannot retrieve movies until TMDB is configured.
 
 1. Obtain the **TMDB API Read Access Token** from https://www.themoviedb.org/settings/api under the provider's applicable terms.
 2. Open https://vercel.com/kanish-tech/cinevault/settings/environment-variables and add `TMDB_API_READ_ACCESS_TOKEN` for Production. Keep the value out of GitHub and client code.
@@ -35,11 +35,17 @@ This one credential enables search, discovery, metadata, posters, language/genre
 ## Optional external services
 
 - **IMDb:** configure `OMDB_API_KEY` and redeploy. Unavailable IMDb ratings remain separate from TMDB ratings.
-- **Cloud sync:** configure `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`; apply the reviewed PostgreSQL migration; sign in and enable sync explicitly. See README for the callback URL, ownership model and conflict behavior. Local mode requires none of these.
+- **Cloud sync:** configure `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`; apply the reviewed PostgreSQL migration; sign in and enable sync explicitly. See README for the callback URL, ownership model and conflict behavior. Local mode requires none of these.
 - **Voice:** browser speech recognition is implemented with text fallback and language selection. Test on an HTTPS Android browser with microphone permission. This is spoken-title capture, not a conversational AI assistant.
 
 ## Remaining optional improvements
 
-Cloud-synced preferences, per-episode progress, a dated rewatch journal, stronger typo candidate expansion, shared rate limiting, route-level client bundle splitting and advanced voice conversation remain future work. Browser data can be erased by clearing site data or profile removal; keep JSON backups outside the browser.
+Per-episode progress, a dated rewatch journal, stronger typo candidate expansion, shared rate limiting, route-level client bundle splitting and advanced voice conversation remain future work. Browser data can be erased by clearing site data or profile removal; keep JSON backups outside the browser.
 
 The README contains setup, storage design, migrations, tests, deployment maintenance, provider attribution and troubleshooting. Screenshots in `docs/` show the real empty application before API credentials are configured.
+
+## Google account sync update
+
+Google OIDC replaces GitHub login. Verified Google subjects own all synchronized Neon records. Shared preferences now synchronize without changing device-specific sync consent or backup history. Apply both numbered SQL migrations before enabling sync. Google credentials, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` must be configured by the account owner; no real OAuth credentials are stored in source. See README → Optional Neon sync for the exact production callback and setup. Live Google consent and multi-device Neon synchronization remain unverified until configuration is complete.
+
+Google sync update validation: lint, strict TypeScript, production build, 43 unit/integration tests, and 16 Playwright cases across desktop and Pixel 7 passed. Google browser tests use intercepted OAuth/sync responses; live account consent and Neon writes are not claimed.

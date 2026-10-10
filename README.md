@@ -18,7 +18,7 @@ A local-first personal movie and television vault. Search a full or partial titl
 - Reactive collection statistics: media/status counts, average personal rating, favorite genres, language distributions, monthly/yearly watched counts, movie runtime with recorded rewatches, ratings, and watched decades.
 - Versioned JSON backup with annotations, preferences and list relationships. CSV includes serialized metadata and entry columns for restoring records and notes; JSON is required for list relationships. Merge preserves existing annotations; replace requires a separate explicit confirmation. Partially invalid records are reported and skipped.
 - Installable PWA, home-screen capture shortcut, Android share target, offline saved collection editing, cached application shell, bounded poster cache, and optional browser storage persistence.
-- Optional authenticated Neon/Drizzle sync with server-verified GitHub identity, owner-scoped queries, durable offline outbox, incremental cursors, revisions, tombstones, idempotent mutations, optimistic conflict detection, and explicit conflict resolution.
+- Optional authenticated Neon/Drizzle sync with server-verified Google identity, owner-scoped queries, durable offline outbox, incremental cursors, revisions, tombstones, idempotent mutations, optimistic conflict detection, and explicit conflict resolution.
 
 ## Screenshots
 
@@ -30,7 +30,7 @@ The screenshots show the actual empty collection with API credentials unconfigur
 
 ## Stack and architecture
 
-Node.js 24, Next.js 16, React 19, strict TypeScript, Tailwind 4, shadcn-style local Button and Radix Dialog primitives, Lucide, Motion, Dexie, Zod, Papa Parse. Optional PostgreSQL uses Neon, Drizzle, and NextAuth's stable v4 line with GitHub OAuth and encrypted HttpOnly JWT sessions.
+Node.js 24, Next.js 16, React 19, strict TypeScript, Tailwind 4, shadcn-style local Button and Radix Dialog primitives, Lucide, Motion, Dexie, Zod, Papa Parse. Optional PostgreSQL uses Neon, Drizzle, and NextAuth's stable v4 line with Google OIDC and encrypted HttpOnly JWT sessions.
 
 ```
 app/                     Pages, manifest and server API routes
@@ -72,8 +72,8 @@ All credentials are server-only. Never use `NEXT_PUBLIC_` for these values, comm
 | `DATABASE_URL`               | Cloud only            | Neon PostgreSQL connection string                              |
 | `NEXTAUTH_SECRET`            | Cloud only            | Strong random auth secret configured by the account owner      |
 | `NEXTAUTH_URL`               | Cloud only            | Canonical application HTTPS origin (localhost for development) |
-| `GITHUB_CLIENT_ID`           | Cloud only            | GitHub OAuth application client ID                             |
-| `GITHUB_CLIENT_SECRET`       | Cloud only            | GitHub OAuth application secret                                |
+| `GOOGLE_CLIENT_ID`           | Cloud only            | Google Web application OAuth client ID                         |
+| `GOOGLE_CLIENT_SECRET`       | Cloud only            | Google OAuth client secret                                     |
 
 The app exposes only configuration booleans at `/api/config`. Missing TMDB yields an actionable 503 response. Missing OMDb does not block saves. Missing cloud configuration disables sign-in and sync while keeping local mode usable.
 
@@ -126,18 +126,21 @@ Settings → Export JSON generates a complete version-1 backup. The “last back
 
 ## Optional Neon sync
 
-1. Provision a Neon database in your own account: <https://console.neon.tech>.
-2. Configure `DATABASE_URL` server-side. Do not expose the connection string in the browser.
-3. Register a GitHub OAuth application with callback:
-   `https://YOUR_PRODUCTION_HOST/api/auth/callback/github`.
-4. Configure the four auth variables above. Generate an auth secret locally with `openssl rand -base64 32` and enter it directly in the deployment environment.
-5. Apply the reviewed migration with environment variables available to the process:
-   `npm run db:migrate`. This creates only `sync_records` and its sequence/index.
-6. Sign in in Settings and explicitly enable sync for the local vault.
+1. Provision or connect a Neon database in your own account: <https://console.neon.tech>. The connected CineVault project already has `DATABASE_URL` configured; keep it server-side.
+2. Open [Google Cloud Console](https://console.cloud.google.com/) and create or select a project. In **Google Auth Platform**, complete **Branding** with CineVault and a support email, and choose an **External** audience. While in Testing, add the Google accounts you will use under **Audience → Test users**. Request only `openid`, `email`, and `profile`; the app does not need Gmail, Drive, or other Google API access.
+3. In **Clients**, create an OAuth client of type **Web application**. Set the authorized JavaScript origin to `https://cinevault-kanish-tech.vercel.app` and the authorized redirect URI to **exactly** `https://cinevault-kanish-tech.vercel.app/api/auth/callback/google`. For local development add `http://localhost:3000` and `http://localhost:3000/api/auth/callback/google` respectively. Alternate deployed hosts need their own matching entries and canonical `NEXTAUTH_URL`.
+4. In Vercel → CineVault → Settings → Environment Variables, add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Production, plus `NEXTAUTH_URL=https://cinevault-kanish-tech.vercel.app`. Generate `NEXTAUTH_SECRET` locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"` and enter it directly into Vercel. Never commit real values or prefix these names with `NEXT_PUBLIC_`. GitHub OAuth credentials are no longer used.
+5. Apply **both** reviewed migrations, `migrations/0001_sync.sql` then `migrations/0002_sync_preferences.sql`, in Neon SQL Editor against the database used by `DATABASE_URL`. Alternatively, with the connection string supplied securely to the local process, run `npm run db:migrate`. The idempotent migration runner runs every numbered SQL file in order; it does not drop saved records. The second migration allows shared preferences in the existing sync table.
+6. Redeploy the latest `main` commit. `/api/config` should report `cloud: true`; this indicates that credentials are present, not that Google login or the migration is proven working.
+7. Open Settings → Optional cloud sync → **Continue with Google**, then enable sync for this local vault. First sign-in creates the account identity automatically; no password or separate registration is needed. On the other device use **the same Google account and canonical app URL**, enable sync, and select Sync now. Verify by saving a title on one device and observing it on the other, then editing a note in the other direction.
 
-The server derives ownership from its verified session token, never a supplied client user ID. Database writes occur only in the authenticated API. Owner advisory locks serialize writes, optimistic base revisions prevent lost updates, tombstones propagate deletion, mutation UUIDs support retry idempotency, and sequence cursors pull updates incrementally. Pending local edits are retained until acknowledged. Changes sync every 30 seconds while the app is open and again on connectivity restoration. Conflicts keep local data and offer “keep this device” or “use cloud” in Settings. First-time same-record clashes require review. A local vault is bound to one authenticated account; use a separate browser profile for another account. Sync is not a replacement for backups.
+The server derives ownership from Google's immutable subject in its verified, encrypted HttpOnly session, never from a supplied email or user ID. Only verified Google profiles are accepted. Every Neon read/write is scoped to that subject. A client-supplied expected account is compared against the verified session solely to reject account switches during an in-flight sync. Owner advisory locks serialize writes, base revisions prevent lost updates, tombstones propagate deletion, mutation UUIDs make retries idempotent, and cursors pull updates incrementally. Pending offline edits remain until acknowledged. Manual and background sync requests are deduplicated on the client. Changes sync every 30 seconds while the app is open and on connectivity restoration; the app does not promise background sync while closed. Conflicts offer “keep this device” or “use cloud”.
 
-**External verification limit:** Cloud end-to-end flows require configured Neon/OAuth credentials; protocol validation is tested without them. Preferences stay local and are portable through JSON; current cloud sync covers media, library entries, lists and relationships. Per-episode TV progress and a complete dated rewatch-event journal are future extensions; the current implementation records latest watched date and rewatch count.
+Cloud data includes movie/TV metadata (including cached rating/provider information), saved entries, statuses, notes, personal ratings, favorites, watched date, rewatch count, custom lists, list membership/order, and shared preferences: region, theme, default status/sort, preferred languages and voice language. Sync consent and last-backup timestamp stay device-specific. Provider information is cached metadata and can expire; it is not guaranteed current availability. Sync is not a replacement for backups.
+
+**Account changes and existing GitHub vaults:** Old GitHub sessions cannot access the sync API, and identities are never automatically linked by email. A local vault is bound to one account. If it was previously synced with GitHub or another Google account, export its JSON backup and use a separate browser profile for the new account, import the backup, then explicitly enable sync. This avoids uploading a previous account's data into the next signed-in account. Existing cloud GitHub records are retained in Neon under their original owner; no automatic transfer is performed.
+
+**External verification limit:** Google OAuth and real Neon synchronization require the missing OAuth/session variables and applied migrations. Automated tests cover verified-profile checks, session identity, unauthenticated/cross-origin/mismatched-account rejection, owner-scoped SQL generation, preference sync, conflicts, duplicate-request suppression, and offline data preservation. Browser tests intercept provider responses and do not prove real Google consent or live database access. Per-episode TV progress and a dated rewatch-event journal remain future extensions.
 
 ## PWA and offline behavior
 
