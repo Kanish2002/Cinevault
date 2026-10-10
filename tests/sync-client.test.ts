@@ -15,24 +15,24 @@ describe('account-scoped cloud sync and offline changes', () => {
   it('claims an unbound vault atomically and blocks a different account before any request', async () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
-    await assertVaultOwner('google:alice');
-    await expect(runSync('google:bob')).rejects.toThrow('another account');
-    await expect(runSync('github:alice')).rejects.toThrow('Google');
+    await assertVaultOwner('neon:alice');
+    await expect(runSync('neon:bob')).rejects.toThrow('another account');
+    await expect(runSync('github:alice')).rejects.toThrow('Sign in');
     expect(fetcher).not.toHaveBeenCalled();
-    expect((await db.state.get('sync-owner'))?.value).toBe('google:alice');
+    expect((await db.state.get('sync-owner'))?.value).toBe('neon:alice');
   });
   it('sends the expected account guard and clears only acknowledged changes', async () => {
     await addMedia(fixture());
     const pending = await db.outbox.toArray();
     const fetcher = vi.fn(async (_url: string, options: RequestInit) => {
-      expect(JSON.parse(options.body as string).expectedOwner).toBe('google:alice');
+      expect(JSON.parse(options.body as string).expectedOwner).toBe('neon:alice');
       return response({
         ...empty,
         accepted: pending.map((c) => ({ key: c.key, mutationId: c.mutationId, revision: 1 })),
       });
     });
     vi.stubGlobal('fetch', fetcher);
-    await runSync('google:alice');
+    await runSync('neon:alice');
     expect(await db.outbox.count()).toBe(0);
     expect(await db.entries.count()).toBe(1);
   });
@@ -43,7 +43,7 @@ describe('account-scoped cloud sync and offline changes', () => {
       'fetch',
       vi.fn(async () => response({ error: 'Your signed-in account changed.' }, 409)),
     );
-    await expect(runSync('google:alice')).rejects.toThrow('account changed');
+    await expect(runSync('neon:alice')).rejects.toThrow('account changed');
     expect(await db.outbox.count()).toBe(2);
     expect((await db.entries.get('movie:911'))?.notes).toBe('Keep me');
   });
@@ -57,10 +57,10 @@ describe('account-scoped cloud sync and offline changes', () => {
       return response(empty);
     });
     vi.stubGlobal('fetch', fetcher);
-    const first = runSync('google:alice');
-    const second = runSync('google:alice');
+    const first = runSync('neon:alice');
+    const second = runSync('neon:alice');
     expect(first).toBe(second);
-    await expect(runSync('google:bob')).rejects.toThrow('Another account');
+    await expect(runSync('neon:bob')).rejects.toThrow('Another account');
     release();
     await Promise.all([first, second]);
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -80,7 +80,7 @@ describe('account-scoped cloud sync and offline changes', () => {
       'fetch',
       vi.fn(async () => response({ ...empty, records: [remote], cursor: 8 })),
     );
-    await runSync('google:alice');
+    await runSync('neon:alice');
     expect(await getPreferences()).toMatchObject({
       preferredRegion: 'GB',
       theme: 'light',
@@ -118,7 +118,7 @@ describe('account-scoped cloud sync and offline changes', () => {
         response({ ...empty, records: [remote], cursor: 10, conflicts: [remote.key] }),
       ),
     );
-    expect(await runSync('google:alice')).toEqual({ conflicts: 1 });
+    expect(await runSync('neon:alice')).toEqual({ conflicts: 1 });
     expect((await getPreferences()).preferredRegion).toBe('GB');
     await resolveConflict(remote.key, 'cloud');
     expect(await getPreferences()).toMatchObject({ preferredRegion: 'IN', syncEnabled: true });

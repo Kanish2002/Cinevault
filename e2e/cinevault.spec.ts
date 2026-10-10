@@ -3,7 +3,7 @@ import { fixture, result } from '../tests/fixtures';
 async function mockMovies(page: Page) {
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname.startsWith('/api/auth/')) return route.fulfill({ json: {} });
+    if (url.pathname.startsWith('/api/auth/')) return route.fulfill({ json: null });
     if (url.pathname === '/api/config')
       return route.fulfill({ json: { tmdb: true, omdb: false, cloud: false } });
     if (url.pathname === '/api/search') {

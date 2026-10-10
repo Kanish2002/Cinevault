@@ -10,7 +10,7 @@ import {
   type Outbox,
 } from '@/types';
 export const syncRequest = z.object({
-  expectedOwner: z.string().regex(/^google:[^\s:]{1,255}$/),
+  expectedOwner: z.string().regex(/^neon:[^\s:]{1,255}$/),
   cursor: z.number().int().nonnegative(),
   changes: z
     .array(

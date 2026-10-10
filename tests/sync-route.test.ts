@@ -5,13 +5,16 @@ import type { SQL } from 'drizzle-orm';
 import { fixture } from './fixtures';
 
 const mocks = vi.hoisted(() => ({
-  getToken: vi.fn(),
+  getSession: vi.fn(),
   end: vi.fn(),
   connect: vi.fn(),
   predicates: [] as SQL[],
   written: [] as { ownerId: string }[],
 }));
-vi.mock('next-auth/jwt', () => ({ getToken: mocks.getToken }));
+vi.mock('@/lib/sync/auth', () => ({
+  cloudConfigured: () => true,
+  getAuth: () => ({ getSession: mocks.getSession }),
+}));
 vi.mock('@neondatabase/serverless', () => ({
   Pool: class {
     constructor() {
@@ -46,7 +49,7 @@ vi.mock('drizzle-orm/neon-serverless', () => ({
 }));
 import { POST } from '@/app/api/sync/route';
 const request = (
-  expectedOwner = 'google:alice',
+  expectedOwner = 'neon:alice',
   origin = 'https://cinevault.test',
   changes: unknown[] = [],
 ) =>
@@ -56,42 +59,39 @@ const request = (
     body: JSON.stringify({ expectedOwner, cursor: 0, changes }),
   });
 beforeEach(() => {
-  mocks.getToken.mockReset();
+  mocks.getSession.mockReset();
   mocks.connect.mockClear();
   mocks.end.mockClear();
   mocks.predicates.length = 0;
   mocks.written.length = 0;
   vi.stubEnv('DATABASE_URL', 'postgresql://test.invalid/cinevault');
-  vi.stubEnv('NEXTAUTH_SECRET', 'test-only-secret');
-  vi.stubEnv('GOOGLE_CLIENT_ID', 'test-id');
-  vi.stubEnv('GOOGLE_CLIENT_SECRET', 'test-secret');
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('server sync authorization', () => {
   it('blocks unauthenticated database access', async () => {
-    mocks.getToken.mockResolvedValue(null);
+    mocks.getSession.mockResolvedValue({ data: null });
     expect((await POST(request())).status).toBe(401);
     expect(mocks.connect).not.toHaveBeenCalled();
   });
   it('blocks old GitHub sessions', async () => {
-    mocks.getToken.mockResolvedValue({ sub: 'github:alice' });
+    mocks.getSession.mockResolvedValue({ data: { user: { id: 'github:alice' } } });
     expect((await POST(request())).status).toBe(401);
     expect(mocks.connect).not.toHaveBeenCalled();
   });
   it('blocks cross-origin writes', async () => {
-    mocks.getToken.mockResolvedValue({ sub: 'google:alice' });
-    expect((await POST(request('google:alice', 'https://evil.test'))).status).toBe(403);
+    mocks.getSession.mockResolvedValue({ data: { user: { id: 'alice' } } });
+    expect((await POST(request('neon:alice', 'https://evil.test'))).status).toBe(403);
     expect(mocks.connect).not.toHaveBeenCalled();
   });
   it('rejects a client owner that differs from the verified account', async () => {
-    mocks.getToken.mockResolvedValue({ sub: 'google:bob' });
+    mocks.getSession.mockResolvedValue({ data: { user: { id: 'bob' } } });
     expect((await POST(request())).status).toBe(409);
     expect(mocks.connect).not.toHaveBeenCalled();
   });
   it.each(['alice', 'bob'])('scopes reads and writes to the verified %s account', async (id) => {
-    const owner = `google:${id}`;
-    mocks.getToken.mockResolvedValue({ sub: owner });
+    const owner = `neon:${id}`;
+    mocks.getSession.mockResolvedValue({ data: { user: { id } } });
     const change = {
       key: 'media/movie:911',
       kind: 'media',

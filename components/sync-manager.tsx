@@ -1,12 +1,13 @@
-"use client";
-import { useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { useLibrary } from "./providers";
-import { runSync } from "@/lib/sync/client";
+'use client';
+import { useEffect } from 'react';
+import { authClient } from '@/lib/auth/client';
+import { accountOwner } from '@/lib/sync/identity';
+import { useLibrary } from './providers';
+import { runSync } from '@/lib/sync/client';
 export function SyncManager() {
   const { prefs, toast } = useLibrary();
-  const { data: session } = useSession();
-  const owner = session?.user?.id;
+  const { data: session } = authClient.useSession();
+  const owner = accountOwner(session?.user?.id);
   useEffect(() => {
     if (!prefs.syncEnabled || !owner) return;
     let running = false,
@@ -16,26 +17,21 @@ export function SyncManager() {
       running = true;
       try {
         const r = await runSync(owner);
-        if (r.conflicts)
-          toast("Cloud sync has conflicting changes. Review them in Settings.");
+        if (r.conflicts) toast('Cloud sync has conflicting changes. Review them in Settings.');
       } catch (e) {
         if (!cancelled)
-          toast(
-            e instanceof Error
-              ? e.message
-              : "Sync failed; your local changes are safe.",
-          );
+          toast(e instanceof Error ? e.message : 'Sync failed; your local changes are safe.');
       } finally {
         running = false;
       }
     };
     void sync();
     const timer = setInterval(() => void sync(), 30000);
-    window.addEventListener("online", sync);
+    window.addEventListener('online', sync);
     return () => {
       cancelled = true;
       clearInterval(timer);
-      window.removeEventListener("online", sync);
+      window.removeEventListener('online', sync);
     };
   }, [prefs.syncEnabled, owner, toast]);
   return null;

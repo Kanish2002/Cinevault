@@ -10,16 +10,16 @@ import {
   type SyncRecord,
   type SyncKind,
 } from '@/types';
-import { isGoogleOwner } from './identity';
+import { isAccountOwner } from './identity';
 import { validateChange } from './protocol';
 
 export async function assertVaultOwner(owner: string) {
-  if (!isGoogleOwner(owner)) throw new Error('Sign in with Google before synchronizing.');
+  if (!isAccountOwner(owner)) throw new Error('Sign in to your account before synchronizing.');
   await db.transaction('rw', db.state, async () => {
     const binding = await db.state.get('sync-owner');
     if (binding && binding.value !== owner)
       throw new Error(
-        'This local vault belongs to another account. Export a backup and use a separate browser profile for this Google account.',
+        'This local vault belongs to another account. Export a backup and use a separate browser profile for this account.',
       );
     await db.state.put({ id: 'sync-owner', value: owner });
   });

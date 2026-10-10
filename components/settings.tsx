@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { authClient } from '@/lib/auth/client';
+import { accountOwner } from '@/lib/sync/identity';
+import { AccountForm } from './account-form';
 import {
   Download,
   Upload,
@@ -30,7 +32,7 @@ import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
 export function SettingsPage() {
   const { prefs, toast, rows } = useLibrary();
-  const { data: session } = useSession();
+  const { data: session } = authClient.useSession();
   const [config, setConfig] = useState<{
       tmdb: boolean;
       omdb: boolean;
@@ -60,7 +62,7 @@ export function SettingsPage() {
     () => setLanguagesInput(prefs.languagePreferences.join(', ')),
     [prefs.languagePreferences],
   );
-  const owner = session?.user?.id;
+  const owner = accountOwner(session?.user?.id);
   const [syncChoice, setSyncChoice] = useState<boolean | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   useEffect(() => {
@@ -317,17 +319,17 @@ export function SettingsPage() {
           </h2>
           <p>
             {config?.cloud
-              ? 'Sign in with Google and enable sync to keep your movies, lists, notes, ratings, and preferences together on every device.'
-              : 'Local mode is active. Account sync needs Neon and Google sign-in configuration.'}
+              ? 'Create an account or sign in with your email and CineVault password, then enable sync to keep your movies, lists, notes, ratings, and preferences together on every device.'
+              : 'Local mode is active. Account sync needs Neon authentication configuration.'}
           </p>
           {config?.cloud ? (
             owner ? (
               <>
-                <p>Signed in as {session.user?.email || session.user?.name}</p>
+                <p>Signed in as {session?.user?.email || session?.user?.name}</p>
                 {wrongAccount && (
                   <p role="alert">
                     This local vault belongs to another account. Use a separate browser profile for
-                    this Google account. Export a backup before moving an older GitHub vault.
+                    this account. Export a backup before moving an older vault.
                   </p>
                 )}
                 <label className="checkbox-label">
@@ -378,7 +380,11 @@ export function SettingsPage() {
                     variant="ghost"
                     onClick={() => {
                       void savePreferences({ syncEnabled: false })
-                        .then(() => signOut({ callbackUrl: '/settings' }))
+                        .then(() =>
+                          authClient.signOut().then((result) => {
+                            if (result.error) throw new Error(result.error.message);
+                          }),
+                        )
                         .catch((e) => toast(errorMessage(e)));
                     }}
                   >
@@ -387,14 +393,11 @@ export function SettingsPage() {
                 </div>
               </>
             ) : (
-              <Button onClick={() => void signIn('google', { callbackUrl: '/settings' })}>
-                Continue with Google
-              </Button>
+              <AccountForm />
             )
           ) : (
             <p className="small muted">
-              Google account sync is not available yet. Your saved collection remains on this
-              device.
+              Account sync is not available yet. Your saved collection remains on this device.
             </p>
           )}
           {conflicts?.map((c) => (

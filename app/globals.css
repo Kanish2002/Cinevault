@@ -2421,3 +2421,20 @@ small {
     scroll-behavior: auto !important;
   }
 }
+
+.account-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+.account-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+}
+.account-form input {
+  width: 100%;
+}
+.account-form .inline-actions {
+  flex-wrap: wrap;
+}

@@ -1,11 +1,11 @@
-import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { Pool } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { and, eq, gt, asc, sql } from 'drizzle-orm';
 import { syncRecords } from '@/lib/sync/schema';
-import { cloudConfigured } from '@/lib/sync/auth';
-import { isGoogleOwner, syncIdentityMatches } from '@/lib/sync/identity';
+import { cloudConfigured, getAuth } from '@/lib/sync/auth';
+import { accountOwner, syncIdentityMatches } from '@/lib/sync/identity';
+import { ensureSyncSchema } from '@/lib/sync/migrate';
 import { syncRequest, validateChange } from '@/lib/sync/protocol';
 import { guard, errorResponse } from '@/lib/api/route';
 export async function POST(req: NextRequest) {
@@ -19,22 +19,28 @@ export async function POST(req: NextRequest) {
     guard(req);
     if (req.headers.get('origin') !== new URL(req.url).origin)
       return Response.json({ error: 'Invalid request origin.' }, { status: 403 });
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!isGoogleOwner(token?.sub))
+    const { data: session, error } = await getAuth().getSession();
+    if (error)
+      return Response.json(
+        { error: 'Account service is unavailable. Your local changes are safe.' },
+        { status: 503 },
+      );
+    const owner = accountOwner(session?.user?.id);
+    if (!owner)
       return Response.json({ error: 'Sign in to synchronize your collection.' }, { status: 401 });
     const raw = await req.text();
     if (raw.length > 2000000)
       return Response.json({ error: 'Sync batch too large.' }, { status: 413 });
     const body = syncRequest.parse(JSON.parse(raw));
-    if (!syncIdentityMatches(token!.sub, body.expectedOwner))
+    if (!syncIdentityMatches(owner, body.expectedOwner))
       return Response.json(
         { error: 'Your signed-in account changed. Reload before synchronizing.' },
         { status: 409 },
       );
-    const changes = body.changes.map(validateChange),
-      owner = token!.sub!;
+    const changes = body.changes.map(validateChange);
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const database = drizzle(pool);
+    await ensureSyncSchema(database);
     const result = await database.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${owner}))`);
       const accepted: { key: string; mutationId: string; revision: number }[] = [],

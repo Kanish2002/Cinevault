@@ -14,6 +14,7 @@
     "test:production": "node --import tsx scripts/production-smoke.ts"
   },
   "dependencies": {
+    "@neondatabase/auth": "^0.5.0-beta",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
@@ -25,7 +26,6 @@
     "lucide-react": "^0.468.0",
     "motion": "^12.23.24",
     "next": "16.4.0",
-    "next-auth": "^4.24.13",
     "papaparse": "^5.5.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
