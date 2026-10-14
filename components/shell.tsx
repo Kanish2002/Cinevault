@@ -13,8 +13,10 @@ import {
   Plus,
   ArrowUpRight,
   WifiOff,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Dialog } from './ui/dialog';
 import { GlobalSearch } from './search';
 import { useLibrary } from './providers';
 const nav = [
@@ -28,6 +30,8 @@ const nav = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { rows, prefs } = useLibrary();
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [path]);
   const [offline, setOffline] = useState(false);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
@@ -91,7 +95,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             Settings & backup
           </Link>
           <div className="sidebar-profile">
-            <div className="avatar">K</div>
+            <div className="avatar">
+              <Clapperboard size={17} aria-hidden />
+            </div>
             <div>
               <strong>My personal vault</strong>
               <small>
@@ -148,7 +154,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </footer>
       </div>
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {nav.slice(0, 5).map((n) => (
+        {nav.slice(0, 4).map((n) => (
           <Link
             href={n.url}
             key={n.url}
@@ -159,7 +165,34 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span>{n.name.replace('My ', '')}</span>
           </Link>
         ))}
+        <button
+          onClick={() => setMoreOpen(true)}
+          aria-label="More navigation"
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          className={
+            ['/collections', '/statistics', '/settings', '/bulk'].includes(path) ? 'selected' : ''
+          }
+        >
+          <MoreHorizontal size={20} />
+          <span>More</span>
+        </button>
       </nav>
+      <Dialog open={moreOpen} onOpenChange={setMoreOpen} title="Your CineVault">
+        <nav className="more-navigation" aria-label="More navigation">
+          {[
+            ...nav.slice(4),
+            { url: '/bulk', name: 'Bulk Add', icon: Plus },
+            { url: '/settings', name: 'Settings & backup', icon: Settings },
+          ].map((n) => (
+            <Link key={n.url} href={n.url} onClick={() => setMoreOpen(false)}>
+              <n.icon size={22} />
+              <span>{n.name}</span>
+              <ArrowUpRight size={18} />
+            </Link>
+          ))}
+        </nav>
+      </Dialog>
     </div>
   );
 }
