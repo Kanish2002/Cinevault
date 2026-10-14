@@ -33,10 +33,11 @@ export function GlobalSearch() {
       setOpen(true);
     },
   });
+  const cancelVoice = voice.cancel;
   useEffect(() => {
     setOpen(false);
-    voice.cancel();
-  }, [path, voice.cancel]);
+    cancelVoice();
+  }, [path, cancelVoice]);
   const saved = new Set(rows.map((m) => m.id));
   useEffect(() => {
     if (searchParams.get('capture')) {

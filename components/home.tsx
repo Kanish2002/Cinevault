@@ -75,7 +75,7 @@ export function HomePage() {
               <Plus size={18} /> Find a movie
             </Button>
             <Link href="/bulk" className="button button-outline">
-              <Layers3 size={18} /> Bulk Add
+              <Layers3 size={18} /> Add a list
             </Link>
           </div>
           <div className="hero-features">

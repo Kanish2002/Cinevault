@@ -187,7 +187,9 @@ test('search mic exposes Listening and Stop and recovers from denied permission'
   await expect(page.getByRole('button', { name: 'Find matches', exact: true })).toBeEnabled();
 });
 
-test('bulk mobile speech replay and natural endings do not duplicate titles or strand Stop', async ({ page }) => {
+test('bulk mobile speech replay and natural endings do not duplicate titles or strand Stop', async ({
+  page,
+}) => {
   await movies(page);
   await fakeSpeech(page);
   await page.goto('/bulk');
@@ -195,7 +197,13 @@ test('bulk mobile speech replay and natural endings do not duplicate titles or s
   await page.getByRole('button', { name: 'Dictate movie titles' }).click();
   await emit(page, 'Vikram');
   await page.evaluate(() => {
-    const s = (window as unknown as { speechQA: { current: { results: unknown[]; onresult: (e: unknown) => void; onend: () => void } } }).speechQA.current;
+    const s = (
+      window as unknown as {
+        speechQA: {
+          current: { results: unknown[]; onresult: (e: unknown) => void; onend: () => void };
+        };
+      }
+    ).speechQA.current;
     s.onresult({ resultIndex: 0, results: s.results });
     s.onend();
   });
@@ -206,7 +214,9 @@ test('bulk mobile speech replay and natural endings do not duplicate titles or s
   await expect(page.getByRole('button', { name: 'Find matches', exact: true })).toBeEnabled();
 });
 
-test('editing a matched batch invalidates stale selections and over-limit input stays intact', async ({ page }) => {
+test('editing a matched batch invalidates stale selections and over-limit input stays intact', async ({
+  page,
+}) => {
   await movies(page);
   await page.goto('/bulk');
   const input = page.getByLabel('Movie titles', { exact: true });
