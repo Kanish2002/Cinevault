@@ -186,3 +186,48 @@ test('search mic exposes Listening and Stop and recovers from denied permission'
   await page.getByRole('textbox', { name: 'Movie titles', exact: true }).fill('Vikram');
   await expect(page.getByRole('button', { name: 'Find matches', exact: true })).toBeEnabled();
 });
+
+test('bulk mobile speech replay and natural endings do not duplicate titles or strand Stop', async ({
+  page,
+}) => {
+  await movies(page);
+  await fakeSpeech(page);
+  await page.goto('/bulk');
+  await page.getByLabel('Dictation language').selectOption('ta-IN');
+  await page.getByRole('button', { name: 'Dictate movie titles' }).click();
+  await emit(page, 'Vikram');
+  await page.evaluate(() => {
+    const s = (
+      window as unknown as {
+        speechQA: {
+          current: { results: unknown[]; onresult: (e: unknown) => void; onend: () => void };
+        };
+      }
+    ).speechQA.current;
+    s.onresult({ resultIndex: 0, results: s.results });
+    s.onend();
+  });
+  await expect(page.getByRole('status').filter({ hasText: 'Listening…' })).toBeVisible();
+  await emit(page, 'Kaithi');
+  await page.getByRole('button', { name: 'Stop dictating movie titles' }).click();
+  await expect(page.getByLabel('Movie titles', { exact: true })).toHaveValue('Vikram\nKaithi');
+  await expect(page.getByRole('button', { name: 'Find matches', exact: true })).toBeEnabled();
+});
+
+test('editing a matched batch invalidates stale selections and over-limit input stays intact', async ({
+  page,
+}) => {
+  await movies(page);
+  await page.goto('/bulk');
+  const input = page.getByLabel('Movie titles', { exact: true });
+  await input.fill('Vikram');
+  await page.getByRole('button', { name: 'Find matches', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save selected matches' })).toBeEnabled();
+  await input.fill('Kaithi');
+  await expect(page.getByRole('button', { name: 'Save selected matches' })).toBeDisabled();
+  const large = Array.from({ length: 201 }, (_, i) => `Title ${i}`).join('\n');
+  await input.fill(large);
+  await page.getByRole('button', { name: 'Find matches', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '200 titles or fewer' })).toBeVisible();
+  await expect(input).toHaveValue(large);
+});

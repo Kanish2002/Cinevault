@@ -1,5 +1,5 @@
 'use client';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Search, Mic, Square, LoaderCircle, Plus, Check, ArrowUpRight, X } from 'lucide-react';
@@ -11,6 +11,7 @@ import type { SearchResult, Media } from '@/types';
 import { useVoiceInput } from '@/lib/use-voice-input';
 export function GlobalSearch() {
   const searchParams = useSearchParams();
+  const path = usePathname();
   const { prefs, rows, toast } = useLibrary();
   const [query, setQuery] = useState(''),
     [results, setResults] = useState<SearchResult[]>([]),
@@ -32,6 +33,11 @@ export function GlobalSearch() {
       setOpen(true);
     },
   });
+  const cancelVoice = voice.cancel;
+  useEffect(() => {
+    setOpen(false);
+    cancelVoice();
+  }, [path, cancelVoice]);
   const saved = new Set(rows.map((m) => m.id));
   useEffect(() => {
     if (searchParams.get('capture')) {
@@ -47,9 +53,13 @@ export function GlobalSearch() {
       setBusy(false);
       return;
     }
+    setResults([]);
+    setActive(0);
+    setBusy(true);
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       if (!navigator.onLine) {
+        setBusy(false);
         setError(
           'You are offline. Your saved collection is available; online search will resume when connected.',
         );
@@ -62,6 +72,7 @@ export function GlobalSearch() {
           `/api/search?q=${encodeURIComponent(query.trim())}`,
           { signal: controller.signal },
         );
+        if (controller.signal.aborted) return;
         setResults(d.results);
         setActive(0);
       } catch (e) {
@@ -143,15 +154,23 @@ export function GlobalSearch() {
           }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setOpen(false);
-            if (e.key === 'ArrowDown') {
+            if (e.key === 'ArrowDown' && results.length) {
               e.preventDefault();
               setActive((i) => Math.min(results.length - 1, i + 1));
             }
-            if (e.key === 'ArrowUp') {
+            if (e.key === 'ArrowUp' && results.length) {
               e.preventDefault();
               setActive((i) => Math.max(0, i - 1));
             }
-            if (e.key === 'Enter' && results[active]) {
+            if (
+              e.key === 'Enter' &&
+              open &&
+              !busy &&
+              !voice.active &&
+              !adding &&
+              results[active] &&
+              !saved.has(results[active].id)
+            ) {
               e.preventDefault();
               void quickAdd(results[active]);
             }

@@ -1,8 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Check, Search, Plus, RotateCcw, Mic, Square } from 'lucide-react';
+import { Check, Search, Plus, RotateCcw, Mic, Square, ListVideo, ShieldCheck } from 'lucide-react';
 import { api, errorMessage } from '@/lib/utils';
-import { addMedia, db } from '@/lib/db';
+import { addMedia, db, savePreferences } from '@/lib/db';
 import { useLibrary } from './providers';
 import { Button } from './ui/button';
 import type { SearchResult, Media } from '@/types';
@@ -21,6 +21,7 @@ export function BulkPage() {
     [rows, setRows] = useState<Row[]>([]),
     [busy, setBusy] = useState(false);
   const cancel = useRef(false);
+  const [voiceError, setVoiceError] = useState('');
   useEffect(
     () => () => {
       cancel.current = true;
@@ -30,9 +31,13 @@ export function BulkPage() {
   const voice = useVoiceInput({
     language: prefs.voiceLanguage,
     continuous: true,
-    onError: toast,
+    onError: (message) => {
+      setVoiceError(message);
+      toast(message);
+    },
     onTranscript: (transcript) => {
       const titles = spokenMovieTitles(transcript);
+      setRows([]);
       if (titles.length)
         setText(
           (current) => `${current.trimEnd()}${current.trim() ? '\n' : ''}${titles.join('\n')}`,
@@ -42,6 +47,12 @@ export function BulkPage() {
   const update = (index: number, patch: Partial<Row>) =>
     setRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   async function match(onlyErrors = false) {
+    if (!onlyErrors && text.split(/\n/).filter((t) => t.trim()).length > 200) {
+      toast(
+        'Please use 200 titles or fewer. Your full list is kept so you can split it into batches.',
+      );
+      return;
+    }
     setBusy(true);
     cancel.current = false;
     const work = onlyErrors
@@ -134,9 +145,51 @@ export function BulkPage() {
           you meant.
         </p>
       </div>
+      <ol className="bulk-steps" aria-label="Bulk add steps">
+        <li className={!rows.length ? 'current' : ''}>
+          <span>1</span> Paste or speak
+        </li>
+        <li className={rows.some((r) => r.state === 'review') ? 'current' : ''}>
+          <span>2</span> Review matches
+        </li>
+        <li className={rows.some((r) => r.state === 'saved') ? 'current' : ''}>
+          <span>3</span> Save to your vault
+        </li>
+      </ol>
       <div className="bulk-layout">
         <section className="stat-panel">
-          <h2>Your movie list</h2>
+          <div className="bulk-panel-heading">
+            <h2>Your movie list</h2>
+            <span className="muted small">
+              {text.split('\n').filter((t) => t.trim()).length} / 200 titles
+            </span>
+          </div>
+          <label className="voice-language">
+            Speaking language
+            <select
+              aria-label="Dictation language"
+              value={prefs.voiceLanguage}
+              disabled={voice.active || busy}
+              onChange={(e) =>
+                void savePreferences({ voiceLanguage: e.target.value }).catch((e) =>
+                  toast(errorMessage(e)),
+                )
+              }
+            >
+              {[
+                ['en-IN', 'English (India)'],
+                ['ta-IN', 'Tamil'],
+                ['hi-IN', 'Hindi'],
+                ['te-IN', 'Telugu'],
+                ['ml-IN', 'Malayalam'],
+                ['kn-IN', 'Kannada'],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="sr-only" htmlFor="bulk-titles">
             Movie titles
           </label>
@@ -144,7 +197,10 @@ export function BulkPage() {
             id="bulk-titles"
             className="bulk-input"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setRows([]);
+            }}
             placeholder={'Interstellar\nVikram\nKaithi\nDrishyam\nParasite'}
             disabled={busy}
           />
@@ -159,7 +215,11 @@ export function BulkPage() {
               disabled={busy || voice.status === 'stopping'}
               aria-label={voice.active ? 'Stop dictating movie titles' : 'Dictate movie titles'}
               aria-pressed={voice.active}
-              onClick={() => (voice.active ? voice.stop() : voice.start())}
+              onClick={() => {
+                setVoiceError('');
+                if (voice.active) voice.stop();
+                else voice.start();
+              }}
             >
               {voice.active ? <Square size={15} fill="currentColor" /> : <Mic size={17} />}
               {voice.active ? 'Stop' : 'Speak titles'}
@@ -187,6 +247,11 @@ export function BulkPage() {
               before matching.
             </p>
           )}
+          {voiceError && (
+            <p className="voice-error" role="alert">
+              {voiceError}
+            </p>
+          )}
           <p className="muted small">
             Requests are processed one at a time. Ambiguous titles need your selection; existing
             entries keep their status.
@@ -207,6 +272,19 @@ export function BulkPage() {
               </Button>
             )}
           </div>
+          {busy && (
+            <div className="bulk-progress">
+              <progress
+                aria-label="Matching and saving progress"
+                max={rows.length || 1}
+                value={rows.filter((r) => !['pending', 'searching'].includes(r.state)).length}
+              />
+              <span role="status">
+                Processing {rows.filter((r) => !['pending', 'searching'].includes(r.state)).length}{' '}
+                of {rows.length} titles…
+              </span>
+            </div>
+          )}
           {rows.length > 0 && (
             <div className="bulk-summary">
               {rows.filter((r) => r.state === 'saved').length} added ·{' '}
@@ -251,9 +329,17 @@ export function BulkPage() {
               </div>
             ))
           ) : (
-            <p className="muted">
-              Your matches will appear here. Nothing is saved until you review the selection.
-            </p>
+            <div className="bulk-empty">
+              <ListVideo size={40} aria-hidden />
+              <h3>Great stories start with a list.</h3>
+              <p>
+                Your matches will appear here, with posters, release years and languages to help you
+                choose.
+              </p>
+              <span>
+                <ShieldCheck size={15} /> Nothing is saved until you confirm.
+              </span>
+            </div>
           )}
           <div className="inline-actions">
             <Button

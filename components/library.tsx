@@ -1,61 +1,57 @@
-"use client";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { SlidersHorizontal, Search, Bookmark, Plus, X } from "lucide-react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, savePreferences } from "@/lib/db";
-import { useLibrary } from "./providers";
-import { MovieGrid } from "./movie-card";
-import { Button } from "./ui/button";
-import { Dialog } from "./ui/dialog";
-import { filterLibrary, sortLibrary, type Filters } from "@/lib/filters";
-import { languageName } from "@/lib/utils";
-import { statuses } from "@/types";
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { SlidersHorizontal, Search, Bookmark, Plus, X } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, savePreferences } from '@/lib/db';
+import { useLibrary } from './providers';
+import { MovieGrid } from './movie-card';
+import { Button } from './ui/button';
+import { Dialog } from './ui/dialog';
+import { filterLibrary, sortLibrary, type Filters } from '@/lib/filters';
+import { languageName } from '@/lib/utils';
+import { statuses } from '@/types';
 export function LibraryPage({ watched = false }: { watched?: boolean }) {
   const { rows, prefs, loading } = useLibrary();
   const params = useSearchParams();
   const [f, setF] = useState<Filters>({
-      language: params.get("language") || "",
-      favorite: params.get("favorite") === "1",
+      language: params.get('language') || '',
+      favorite: params.get('favorite') === '1',
     }),
     [sort, setSort] = useState(prefs.defaultSort),
     [open, setOpen] = useState(false),
-    [selectedList, setSelectedList] = useState("");
+    [selectedList, setSelectedList] = useState('');
   const lists = useLiveQuery(() => db.lists.toArray(), []),
     items = useLiveQuery(() => db.items.toArray(), []);
-  const values = (
-    key: "language" | "genre" | "provider" | "country" | "year" | "decade",
-  ) =>
+  const values = (key: 'language' | 'genre' | 'provider' | 'country' | 'year' | 'decade') =>
     Array.from(
       new Set(
         rows.flatMap((m) =>
-          key === "language"
+          key === 'language'
             ? [m.originalLanguage]
-            : key === "genre"
+            : key === 'genre'
               ? m.genres.map((g) => g.name)
-              : key === "provider"
+              : key === 'provider'
                 ? Object.values(m.availability?.groups || {})
                     .flat()
                     .map((p) => p.name)
-                : key === "country"
+                : key === 'country'
                   ? m.productionCountries
-                  : key === "year"
+                  : key === 'year'
                     ? [m.releaseDate.slice(0, 4)].filter(Boolean)
                     : m.releaseDate
-                      ? [
-                          String(
-                            Math.floor(Number(m.releaseDate.slice(0, 4)) / 10) *
-                              10,
-                          ),
-                        ]
+                      ? [String(Math.floor(Number(m.releaseDate.slice(0, 4)) / 10) * 10)]
                       : [],
         ),
       ),
     ).sort();
+  useEffect(() => {
+    setF({ language: params.get('language') || '', favorite: params.get('favorite') === '1' });
+    setSelectedList('');
+  }, [params]);
+  const all = params.get('all') === '1';
   const base = rows.filter((m) =>
-    watched
-      ? m.entry.watchStatus === "Watched"
-      : m.entry.watchStatus !== "Watched",
+    watched ? m.entry.watchStatus === 'Watched' : all || m.entry.watchStatus !== 'Watched',
   );
   const visible = useMemo(
     () =>
@@ -63,9 +59,7 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
         filterLibrary(base, {
           ...f,
           listIds: selectedList
-            ? (items || [])
-                .filter((i) => i.listId === selectedList)
-                .map((i) => i.mediaId)
+            ? (items || []).filter((i) => i.listId === selectedList).map((i) => i.mediaId)
             : undefined,
         }),
         sort,
@@ -81,75 +75,75 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
     <div className="filter-controls">
       {[
         {
-          key: "language",
-          label: "Original language",
-          options: values("language").map((v) => [v, languageName(v)]),
+          key: 'language',
+          label: 'Original language',
+          options: values('language').map((v) => [v, languageName(v)]),
         },
         {
-          key: "genre",
-          label: "Genre",
-          options: values("genre").map((v) => [v, v]),
+          key: 'genre',
+          label: 'Genre',
+          options: values('genre').map((v) => [v, v]),
         },
         {
-          key: "status",
-          label: "Watch status",
+          key: 'status',
+          label: 'Watch status',
           options: statuses.map((v) => [v, v]),
         },
         {
-          key: "type",
-          label: "Media type",
+          key: 'type',
+          label: 'Media type',
           options: [
-            ["movie", "Movies"],
-            ["tv", "TV series"],
+            ['movie', 'Movies'],
+            ['tv', 'TV series'],
           ],
         },
         {
-          key: "provider",
-          label: "OTT platform",
-          options: values("provider").map((v) => [v, v]),
+          key: 'provider',
+          label: 'OTT platform',
+          options: values('provider').map((v) => [v, v]),
         },
         {
-          key: "year",
-          label: "Release year",
-          options: values("year")
+          key: 'year',
+          label: 'Release year',
+          options: values('year')
             .reverse()
             .map((v) => [v, v]),
         },
         {
-          key: "decade",
-          label: "Decade",
-          options: values("decade")
+          key: 'decade',
+          label: 'Decade',
+          options: values('decade')
             .reverse()
-            .map((v) => [v, v + "s"]),
+            .map((v) => [v, v + 's']),
         },
         {
-          key: "runtime",
-          label: "Runtime",
+          key: 'runtime',
+          label: 'Runtime',
           options: [
-            ["short", "Under 2 hours"],
-            ["long", "2 hours or more"],
+            ['short', 'Under 2 hours'],
+            ['long', '2 hours or more'],
           ],
         },
         {
-          key: "imdb",
-          label: "IMDb minimum",
-          options: ["6", "7", "8", "9"].map((v) => [v, v + "+"]),
+          key: 'imdb',
+          label: 'IMDb minimum',
+          options: ['6', '7', '8', '9'].map((v) => [v, v + '+']),
         },
         {
-          key: "tmdb",
-          label: "TMDB minimum",
-          options: ["6", "7", "8", "9"].map((v) => [v, v + "+"]),
+          key: 'tmdb',
+          label: 'TMDB minimum',
+          options: ['6', '7', '8', '9'].map((v) => [v, v + '+']),
         },
         {
-          key: "country",
-          label: "Production country",
-          options: values("country").map((v) => [v, v]),
+          key: 'country',
+          label: 'Production country',
+          options: values('country').map((v) => [v, v]),
         },
       ].map((field) => (
         <label key={field.key}>
           {field.label}
           <select
-            value={String(f[field.key as keyof Filters] || "")}
+            value={String(f[field.key as keyof Filters] || '')}
             onChange={(e) => set(field.key as keyof Filters, e.target.value)}
           >
             <option value="">All</option>
@@ -163,10 +157,7 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
       ))}
       <label>
         Custom list
-        <select
-          value={selectedList}
-          onChange={(e) => setSelectedList(e.target.value)}
-        >
+        <select value={selectedList} onChange={(e) => setSelectedList(e.target.value)}>
           <option value="">All lists</option>
           {lists?.map((l) => (
             <option key={l.id} value={l.id}>
@@ -179,7 +170,7 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
         <input
           type="checkbox"
           checked={!!f.favorite}
-          onChange={(e) => set("favorite", e.target.checked)}
+          onChange={(e) => set('favorite', e.target.checked)}
         />
         Favorites only
       </label>
@@ -187,7 +178,7 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
         variant="ghost"
         onClick={() => {
           setF({});
-          setSelectedList("");
+          setSelectedList('');
         }}
       >
         Reset filters <X size={16} />
@@ -199,13 +190,13 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
       <div className="page-heading">
         <div className="eyebrow">YOUR PERSONAL CINEMA</div>
         <h1>
-          {watched ? "Stories you’ve" : "Your next"}{" "}
-          <em>{watched ? "experienced." : "great watch."}</em>
+          {all ? 'Your personal' : watched ? 'Stories you’ve' : 'Your next'}{' '}
+          <em>{all ? 'cinema vault.' : watched ? 'experienced.' : 'great watch.'}</em>
         </h1>
         <p>
           {watched
-            ? "Every watched title, rating, and memory in one place."
-            : "All the movies and series you’ve been meaning to get around to."}
+            ? 'Every watched title, rating, and memory in one place.'
+            : 'All the movies and series you’ve been meaning to get around to.'}
         </p>
       </div>
       <div className="library-toolbar">
@@ -214,17 +205,15 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
           <input
             aria-label="Search saved collection"
             placeholder="Search your collection"
-            value={f.query || ""}
-            onChange={(e) => set("query", e.target.value)}
+            value={f.query || ''}
+            onChange={(e) => set('query', e.target.value)}
           />
         </div>
         <Button variant="outline" onClick={() => setOpen(true)}>
           <SlidersHorizontal size={17} />
-          Filters{" "}
+          Filters{' '}
           {Object.values(f).filter(Boolean).length > 0 && (
-            <span className="filter-count">
-              {Object.values(f).filter(Boolean).length}
-            </span>
+            <span className="filter-count">{Object.values(f).filter(Boolean).length}</span>
           )}
         </Button>
         <select
@@ -236,17 +225,17 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
           }}
         >
           {[
-            ["added", "Recently added"],
-            ["watched", "Recently watched"],
-            ["title", "Title A–Z"],
-            ["title-desc", "Title Z–A"],
-            ["imdb", "Highest IMDb"],
-            ["tmdb", "Highest TMDB"],
-            ["newest", "Newest releases"],
-            ["oldest", "Oldest releases"],
-            ["shortest", "Shortest runtime"],
-            ["longest", "Longest runtime"],
-            ["personal", "Personal rating"],
+            ['added', 'Recently added'],
+            ['watched', 'Recently watched'],
+            ['title', 'Title A–Z'],
+            ['title-desc', 'Title Z–A'],
+            ['imdb', 'Highest IMDb'],
+            ['tmdb', 'Highest TMDB'],
+            ['newest', 'Newest releases'],
+            ['oldest', 'Oldest releases'],
+            ['shortest', 'Shortest runtime'],
+            ['longest', 'Longest runtime'],
+            ['personal', 'Personal rating'],
           ].map(([v, label]) => (
             <option key={v} value={v}>
               {label}
@@ -256,20 +245,13 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
       </div>
       <div className="active-filters">
         <span>
-          {visible.length} {visible.length === 1 ? "story" : "stories"}
+          {visible.length} {visible.length === 1 ? 'story' : 'stories'}
         </span>
         {Object.entries(f)
-          .filter(([k, v]) => v && k !== "query")
+          .filter(([k, v]) => v && k !== 'query')
           .map(([k, v]) => (
-            <button
-              key={k}
-              onClick={() => setF((f) => ({ ...f, [k]: undefined }))}
-            >
-              {k === "language"
-                ? languageName(String(v))
-                : v === true
-                  ? "Favorites"
-                  : String(v)}{" "}
+            <button key={k} onClick={() => setF((f) => ({ ...f, [k]: undefined }))}>
+              {k === 'language' ? languageName(String(v)) : v === true ? 'Favorites' : String(v)}{' '}
               <X size={12} />
             </button>
           ))}
@@ -283,25 +265,25 @@ export function LibraryPage({ watched = false }: { watched?: boolean }) {
           <Bookmark size={40} />
           <h2>
             {base.length
-              ? "No stories match these filters."
+              ? 'No stories match these filters.'
               : watched
-                ? "Your first finished story belongs here."
-                : "Your watchlist is waiting for its first story."}
+                ? 'Your first finished story belongs here.'
+                : 'Your watchlist is waiting for its first story.'}
           </h2>
           <p>
             {base.length
-              ? "Try removing a filter or searching a different title."
-              : "Search a title above and add it to your personal vault."}
+              ? 'Try removing a filter or searching a different title.'
+              : 'Search a title above and add it to your personal vault.'}
           </p>
           <Button
             onClick={() =>
               base.length
-                ? setF({})
-                : window.dispatchEvent(new Event("cinevault-search"))
+                ? (setF({}), setSelectedList(''))
+                : window.dispatchEvent(new Event('cinevault-search'))
             }
           >
             <Plus size={17} />
-            {base.length ? "Reset filters" : "Find a movie"}
+            {base.length ? 'Reset filters' : 'Find a movie'}
           </Button>
         </div>
       )}
